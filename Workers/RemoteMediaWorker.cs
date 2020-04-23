@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Renci.SshNet;
-using Sshanty.Helpers;
 using Sshanty.Services;
 using Sshanty.Contracts.Enums;
 
@@ -20,12 +19,14 @@ namespace Sshanty.Workers
 
         private readonly ILogger<RemoteMediaWorker> _logger;
         private readonly IConfiguration _config;
+        private readonly MediaFileService _mediaFileService;
         private readonly MediaInformationService _mediaInformationService;
 
-        public RemoteMediaWorker(ILogger<RemoteMediaWorker> logger, IConfiguration config, MediaInformationService mediaInformationService)
+        public RemoteMediaWorker(ILogger<RemoteMediaWorker> logger, IConfiguration config, MediaFileService mediaFileService, MediaInformationService mediaInformationService)
         {
             _logger = logger;
             _config = config;
+            _mediaFileService = mediaFileService;
             _mediaInformationService = mediaInformationService;
         }
 
@@ -45,11 +46,13 @@ namespace Sshanty.Workers
                 {
                     sftp.Connect();
 
-                    var files = ExploreDirectoryForFiles(sftp, "test");
-                    files.RemoveAll(x => FileNameHelper.ImpliedFileType(x) != FileType.Video);
+                    var files = ExploreDirectoryForFiles(sftp, _config["Directories:RemoteBase"]);
+                    files.RemoveAll(x => _mediaFileService.ImpliedFileType(x) != FileType.Video);
 
                     foreach (var file in files)
                     {
+                        if (token.IsCancellationRequested)
+                            break;
                         var fileName = Path.GetFileName(file);
                         var info = _mediaInformationService.GetMediaInformation(file, token);
                         if (info.Success)
@@ -57,7 +60,10 @@ namespace Sshanty.Workers
                             switch (info.Type)
                             {
                                 case MediaType.Episode:
-                                    _logger.LogInformation("{0} - S{1:00}E{2:00}", info.Title, info.Season, info.Episode);
+                                    _logger.LogInformation("Episode: {0} - S{1:00}E{2:00}", info.Title, info.Season, info.Episode);
+                                    break;
+                                case MediaType.Movie:
+                                    _logger.LogInformation("Movie: {0} ({1})", info.Title, info.Year);
                                     break;
                             }
                         }

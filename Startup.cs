@@ -29,7 +29,9 @@ namespace Sshanty
                         options.JsonSerializerOptions.IgnoreNullValues = true;
                     });
 
-            services.AddSingleton<MediaInformationService>();
+            services
+                .AddSingleton<MediaFileService>()
+                .AddSingleton<MediaInformationService>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
