@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +12,7 @@ namespace Sshanty.Workers
     public class RemoteMediaWorker : BackgroundService
     {
         public const int CYCLE_PERIOD = 1000 * 60 * 15; // 15 minutes
+        public const int DISCOVERY_RECURSE_MAX_DEPTH = 3;
 
         private readonly ILogger<RemoteMediaWorker> _logger;
         private readonly IConfiguration _config;
@@ -42,8 +44,31 @@ namespace Sshanty.Workers
 
                 sw.Stop();
                 _logger.LogDebug("Finished executing task in {0}", sw.Elapsed);
-                await Task.Delay(CYCLE_PERIOD, stoppingToken);
+                await Task.Delay(CYCLE_PERIOD, token);
             }
+        }
+
+        private List<string> ExploreDirectoryForFiles(SftpClient sftp, string path, int depth = 0)
+        {
+            var discoveredFiles = new List<string>();
+            if (depth >= DISCOVERY_RECURSE_MAX_DEPTH)
+            {
+                _logger.LogWarning("Reached maximum recursion depth of {0}", DISCOVERY_RECURSE_MAX_DEPTH);
+                return discoveredFiles;
+            }
+
+            var remoteDirectory = sftp.ListDirectory(path);
+            foreach (var item in remoteDirectory)
+            {
+                if (item.IsRegularFile) discoveredFiles.Add(item.FullName);
+                else if (item.IsDirectory && item.Name != ".." && item.Name != ".")
+                {
+                    _logger.LogDebug("Recursing into directory {0}", item.FullName);
+                    discoveredFiles.AddRange(ExploreDirectoryForFiles(sftp, item.FullName, depth+1));
+                }
+            }
+
+            return discoveredFiles;
         }
     }
 }
