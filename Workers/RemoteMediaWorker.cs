@@ -1,3 +1,4 @@
+using System.IO;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,6 +7,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Renci.SshNet;
+using Sshanty.Helpers;
+using Sshanty.Services;
+using Sshanty.Contracts.Enums;
 
 namespace Sshanty.Workers
 {
@@ -16,16 +20,18 @@ namespace Sshanty.Workers
 
         private readonly ILogger<RemoteMediaWorker> _logger;
         private readonly IConfiguration _config;
+        private readonly MediaInformationService _mediaInformationService;
 
-        public RemoteMediaWorker(ILogger<RemoteMediaWorker> logger, IConfiguration config)
+        public RemoteMediaWorker(ILogger<RemoteMediaWorker> logger, IConfiguration config, MediaInformationService mediaInformationService)
         {
             _logger = logger;
             _config = config;
+            _mediaInformationService = mediaInformationService;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken token)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
                 _logger.LogDebug("Began executing task");
                 var sw = Stopwatch.StartNew();
@@ -35,12 +41,48 @@ namespace Sshanty.Workers
                     new PrivateKeyAuthenticationMethod(
                         _config["Remote:UserName"], new PrivateKeyFile(_config["Remote:PrivateKeyFile"])));
 
-                using (var client = new SshClient(connectionInfo))
+                using (var sftp = new SftpClient(connectionInfo))
                 {
-                    client.Connect();
-                    var cmd = client.RunCommand("ls -la");
-                    _logger.LogInformation(cmd.Result);
+                    sftp.Connect();
+
+                    var files = ExploreDirectoryForFiles(sftp, "test");
+                    files.RemoveAll(x => FileNameHelper.ImpliedFileType(x) != FileType.Video);
+
+                    foreach (var file in files)
+                    {
+                        var fileName = Path.GetFileName(file);
+                        var info = _mediaInformationService.GetMediaInformation(file, token);
+                        if (info.Success)
+                        {
+                            switch (info.Type)
+                            {
+                                case MediaType.Episode:
+                                    _logger.LogInformation("{0} - S{1:00}E{2:00}", info.Title, info.Season, info.Episode);
+                                    break;
+                            }
+                        }
+                    }
+
+                    // foreach (var item in list)
+                    // {
+                    //     if (stoppingToken.IsCancellationRequested)
+                    //         break;
+
+                    //     if (item.IsRegularFile)
+                    //     {
+                    //         _logger.LogInformation("Saving file {0} ({1}b)...", item.Name, item.Length);
+                    //         using var stream = new FileStream(item.Name, FileMode.CreateNew);
+                    //         sftp.DownloadFile(item.FullName, stream);
+                    //     }
+                    // }
                 }
+
+                // using (var client = new SshClient(connectionInfo))
+                // {
+                //     client.Connect();
+                //     var cmd = client.RunCommand("ls -la");
+                //     _logger.LogInformation(cmd.Result);
+                // }
 
                 sw.Stop();
                 _logger.LogDebug("Finished executing task in {0}", sw.Elapsed);
