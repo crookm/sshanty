@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Sshanty.Workers;
 
 namespace Sshanty
 {
@@ -15,6 +17,10 @@ namespace Sshanty
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                })
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddHostedService<RemoteMediaWorker>();
                 });
     }
 }
