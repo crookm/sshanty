@@ -9,6 +9,7 @@ namespace Sshanty.Contracts
     {
         [JsonConverter(typeof(JsonOptionalStringToListConverter))]
         public List<string> Title { get; set; }
+        public string AlternativeTitle { get; set; }
         public int? Year { get; set; }
         public MediaType? Type { get; set; }
         public int? Episode { get; set; }
