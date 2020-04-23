@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Sshanty.Contracts.Enums;
-using Sshanty.Helpers;
+using Sshanty.Serialisers;
 
 namespace Sshanty.Contracts
 {
@@ -14,6 +14,7 @@ namespace Sshanty.Contracts
         public MediaType? Type { get; set; }
         public int? Episode { get; set; }
         public int? Season { get; set; }
+        public string Container { get; set; }
         public bool Success { get; set; } = false;
     }
 }

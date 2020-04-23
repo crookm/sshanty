@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Sshanty.Helpers
+namespace Sshanty.Serialisers
 {
     public class JsonOptionalStringToListConverter : JsonConverter<List<string>>
     {
