@@ -1,10 +1,14 @@
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Sshanty.Contracts.Enums;
+using Sshanty.Helpers;
 
 namespace Sshanty.Contracts
 {
     public class MediaInformationContract
     {
-        public string Title { get; set; }
+        [JsonConverter(typeof(JsonOptionalStringToListConverter))]
+        public List<string> Title { get; set; }
         public int? Year { get; set; }
         public MediaType? Type { get; set; }
         public int? Episode { get; set; }
