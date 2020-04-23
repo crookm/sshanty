@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Sshanty.Services;
 
 namespace Sshanty
 {
@@ -27,6 +28,8 @@ namespace Sshanty
                         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
                         options.JsonSerializerOptions.IgnoreNullValues = true;
                     });
+
+            services.AddSingleton<MediaInformationService>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
