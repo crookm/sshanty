@@ -54,6 +54,7 @@ namespace Sshanty.Services
                         !contract.Episode.HasValue)
                         throw new ArgumentNullException("Series must have a title, season, and episode");
                     paths.Add("tv");
+                    contract.Title[0] = ConvertToAlphaNumSortableTitle(contract.Title[0]);
                     paths.Add(string.Join(" - ", contract.Title));
                     paths.Add(string.Format("Season {0}", contract.Season));
                     paths.Add(string.Format("S{0:00}E{1:00}.{2}",
@@ -64,9 +65,10 @@ namespace Sshanty.Services
                         !contract.Year.HasValue)
                         throw new ArgumentNullException("Movies must have a title and year");
                     paths.Add("movies");
+                    contract.Title[0] = ConvertToAlphaNumSortableTitle(contract.Title[0]);
                     var title = string.Join(" - ", contract.Title);
                     if (!string.IsNullOrEmpty(contract.AlternativeTitle))
-                        title += string.Format(" - {0}");
+                        title += string.Format(" - {0}", contract.AlternativeTitle);
                     title += string.Format(" ({0}).{1}", contract.Year, contract.Container);
                     paths.Add(title);
                     break;
@@ -75,6 +77,22 @@ namespace Sshanty.Services
             }
 
             return Path.Combine(paths.ToArray());
+        }
+
+        private string ConvertToAlphaNumSortableTitle(string mainTitle)
+        {
+            // If the title starts with 'the', move it to the end to enable better sorting in filesystems
+            var outTitle = mainTitle;
+            var mainTitleWords = mainTitle.Split().ToList();
+            if (mainTitleWords.Count > 1 &&
+                string.Equals(mainTitleWords.First(), "the", StringComparison.OrdinalIgnoreCase))
+            {
+                mainTitleWords.RemoveAt(0);
+                mainTitleWords[mainTitleWords.Count - 1] = mainTitleWords[mainTitleWords.Count - 1] + ",";
+                mainTitleWords.Add("The");
+                outTitle = string.Join(" ", mainTitleWords);
+            }
+            return outTitle;
         }
     }
 }
