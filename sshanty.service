@@ -1,0 +1,18 @@
+[Unit]
+Description=SSHanty remote media sync
+After=local-fs.target network.target media-array-files.mount
+
+[Service]
+WorkingDirectory=/opt/sshanty
+ExecStart=/usr/bin/dotnet /opt/sshanty.dll
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+SyslogIdentifier=sshanty
+User=matt
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+[Install]
+WantedBy=multi-user.target
