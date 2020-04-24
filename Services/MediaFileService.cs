@@ -38,7 +38,7 @@ namespace Sshanty.Services
             return FileType.Other;
         }
 
-        public string GenerateFullLocalPath(MediaInformationContract contract)
+        public FileInfo GenerateFullLocalPath(MediaInformationContract contract)
         {
             var paths = new List<string>();
             paths.Add(_config["Directories:LocalBase"]);
@@ -76,7 +76,7 @@ namespace Sshanty.Services
                     throw new NotImplementedException("Media type not implemented");
             }
 
-            return Path.Combine(paths.ToArray());
+            return new FileInfo(Path.Combine(paths.ToArray()));
         }
 
         private string ConvertToAlphaNumSortableTitle(string mainTitle)

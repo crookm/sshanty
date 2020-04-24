@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,6 +37,8 @@ namespace Sshanty.Workers
             {
                 _logger.LogDebug("Began executing task");
                 var sw = Stopwatch.StartNew();
+                var filesDownloaded = 0;
+                var filesSkipped = 0;
 
                 var connectionInfo = new ConnectionInfo(
                     _config["Remote:HostName"], _config["Remote:UserName"],
@@ -45,52 +48,43 @@ namespace Sshanty.Workers
                 using (var sftp = new SftpClient(connectionInfo))
                 {
                     sftp.Connect();
-
                     var files = ExploreDirectoryForFiles(sftp, _config["Directories:RemoteBase"]);
                     files.RemoveAll(x => _mediaFileService.ImpliedFileType(x) != FileType.Video);
-
                     foreach (var file in files)
                     {
                         if (token.IsCancellationRequested)
                             break;
-                        var fileName = Path.GetFileName(file);
-                        var info = _mediaInformationService.GetMediaInformation(file, token);
-                        if (info.Success)
+                        var contract = _mediaInformationService.GetMediaInformation(file, token);
+                        if (contract.Success)
                         {
-                            switch (info.Type)
+                            var localPath = _mediaFileService.GenerateFullLocalPath(contract);
+                            if (!localPath.Directory.Exists)
+                                localPath.Directory.Create();
+                            if (!localPath.Exists)
                             {
-                                case MediaType.Episode:
-                                    _logger.LogInformation("Episode: {0} - S{1:00}E{2:00}", info.Title, info.Season, info.Episode);
-                                    break;
-                                case MediaType.Movie:
-                                    _logger.LogInformation("Movie: {0} ({1})", info.Title, info.Year);
-                                    break;
+                                _logger.LogDebug("Downloading {0} to {1} ...", Path.GetFileName(file), localPath.FullName);
+                                using var stream = new FileStream(localPath.FullName, FileMode.CreateNew);
+                                sftp.DownloadFile(file, stream);
+                                _logger.LogDebug("Finished download");
+                                filesDownloaded++;
+                            }
+                            else
+                            {
+                                _logger.LogDebug("Skipped downloading {0} ({1}) as it already exists",
+                                    contract.Title.FirstOrDefault(),
+                                    contract.Type == MediaType.Episode
+                                        ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
+                                        : contract.Type == MediaType.Movie
+                                            ? contract.Year.ToString()
+                                            : Path.GetFileName(file));
+                                filesSkipped++;
                             }
                         }
                     }
-
-                    // foreach (var item in list)
-                    // {
-                    //     if (stoppingToken.IsCancellationRequested)
-                    //         break;
-
-                    //     if (item.IsRegularFile)
-                    //     {
-                    //         _logger.LogInformation("Saving file {0} ({1}b)...", item.Name, item.Length);
-                    //         using var stream = new FileStream(item.Name, FileMode.CreateNew);
-                    //         sftp.DownloadFile(item.FullName, stream);
-                    //     }
-                    // }
                 }
 
-                // using (var client = new SshClient(connectionInfo))
-                // {
-                //     client.Connect();
-                //     var cmd = client.RunCommand("ls -la");
-                //     _logger.LogInformation(cmd.Result);
-                // }
-
                 sw.Stop();
+                _logger.LogInformation("Downloaded {0} and skipped {1}", filesDownloaded, filesSkipped);
                 _logger.LogDebug("Finished executing task in {0}", sw.Elapsed);
                 await Task.Delay(CYCLE_PERIOD, token);
             }
@@ -112,7 +106,7 @@ namespace Sshanty.Workers
                 else if (item.IsDirectory && item.Name != ".." && item.Name != ".")
                 {
                     _logger.LogDebug("Recursing into directory {0}", item.FullName);
-                    discoveredFiles.AddRange(ExploreDirectoryForFiles(sftp, item.FullName, depth+1));
+                    discoveredFiles.AddRange(ExploreDirectoryForFiles(sftp, item.FullName, depth + 1));
                 }
             }
 

@@ -33,7 +33,7 @@ namespace Sshanty.Controllers
         public string LocalPath([Required][FromQuery]string fileName)
         {
             var contract = _mediaInformationService.GetMediaInformation(fileName);
-            return _mediaFileService.GenerateFullLocalPath(contract);
+            return _mediaFileService.GenerateFullLocalPath(contract).FullName;
         }
     }
 }
