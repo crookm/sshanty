@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Sshanty.Contracts;
@@ -46,6 +47,7 @@ namespace Sshanty.Services
             if (string.IsNullOrEmpty(contract.Container))
                 throw new ArgumentNullException("All media types require container");
 
+            var textInfo = new CultureInfo("en-US", false).TextInfo;
             switch (contract.Type)
             {
                 case MediaType.Episode:
@@ -55,7 +57,9 @@ namespace Sshanty.Services
                         throw new ArgumentNullException("Series must have a title, season, and episode");
                     paths.Add("tv");
                     contract.Title[0] = ConvertToAlphaNumSortableTitle(contract.Title[0]);
-                    paths.Add(string.Join(" - ", contract.Title));
+                    var seriesTitle = string.Join(" - ", contract.Title);
+                    seriesTitle = textInfo.ToTitleCase(seriesTitle);
+                    paths.Add(seriesTitle);
                     paths.Add(string.Format("Season {0}", contract.Season));
                     paths.Add(string.Format("S{0:00}E{1:00}.{2}",
                         contract.Season, contract.Episode, contract.Container));
@@ -69,6 +73,7 @@ namespace Sshanty.Services
                     var title = string.Join(" - ", contract.Title);
                     if (!string.IsNullOrEmpty(contract.AlternativeTitle))
                         title += string.Format(" - {0}", contract.AlternativeTitle);
+                    title = textInfo.ToTitleCase(title);
                     title += string.Format(" ({0}).{1}", contract.Year, contract.Container);
                     paths.Add(title);
                     break;
