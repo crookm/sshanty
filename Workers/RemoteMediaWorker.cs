@@ -62,6 +62,13 @@ namespace Sshanty.Workers
                                 localPath.Directory.Create();
                             if (!localPath.Exists)
                             {
+                                _logger.LogInformation("Downloading {0} ({1})",
+                                    contract.Title.FirstOrDefault(),
+                                    contract.Type == MediaType.Episode
+                                        ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
+                                        : contract.Type == MediaType.Movie
+                                            ? contract.Year.ToString()
+                                            : Path.GetFileName(file));
                                 _logger.LogDebug("Downloading {0} to {1} ...", Path.GetFileName(file), localPath.FullName);
                                 using var stream = new FileStream(localPath.FullName, FileMode.CreateNew);
                                 sftp.DownloadFile(file, stream);
@@ -84,7 +91,7 @@ namespace Sshanty.Workers
                 }
 
                 sw.Stop();
-                _logger.LogInformation("Downloaded {0} and skipped {1}", filesDownloaded, filesSkipped);
+                _logger.LogInformation("✔️ Completed cycle! Downloaded {0} and skipped {1}", filesDownloaded, filesSkipped);
                 _logger.LogDebug("Finished executing task in {0}", sw.Elapsed);
                 await Task.Delay(CYCLE_PERIOD, token);
             }
