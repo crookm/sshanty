@@ -1,5 +1,9 @@
+using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +26,7 @@ namespace Sshanty.Workers
         private readonly IConfiguration _config;
         private readonly MediaFileService _mediaFileService;
         private readonly MediaInformationService _mediaInformationService;
+        private readonly HttpClient _http;
 
         public RemoteMediaWorker(ILogger<RemoteMediaWorker> logger, IConfiguration config, MediaFileService mediaFileService, MediaInformationService mediaInformationService)
         {
@@ -29,6 +34,11 @@ namespace Sshanty.Workers
             _config = config;
             _mediaFileService = mediaFileService;
             _mediaInformationService = mediaInformationService;
+
+            _http = new HttpClient();
+            var authBytes = Encoding.ASCII.GetBytes(_config["RemoteHttp:HttpAuth"]);
+            var authHeader = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
+            _http.DefaultRequestHeaders.Authorization = authHeader;
         }
 
         protected override async Task ExecuteAsync(CancellationToken token)
@@ -48,7 +58,7 @@ namespace Sshanty.Workers
                 using (var sftp = new SftpClient(connectionInfo))
                 {
                     sftp.Connect();
-                    var files = ExploreDirectoryForFiles(sftp, _config["Directories:RemoteBase"]);
+                    var files = ExploreDirectoryForFiles(sftp, _config["Directories:RemoteBase"], token);
                     files.RemoveAll(x => _mediaFileService.ImpliedFileType(x) != FileType.Video);
                     foreach (var file in files)
                     {
@@ -70,10 +80,21 @@ namespace Sshanty.Workers
                                             ? contract.Year.ToString()
                                             : Path.GetFileName(file));
                                 _logger.LogDebug("Downloading {0} to {1} ...", Path.GetFileName(file), localPath.FullName);
-                                using var stream = new FileStream(localPath.FullName, FileMode.CreateNew);
-                                sftp.DownloadFile(file, stream);
-                                _logger.LogDebug("Finished download");
-                                filesDownloaded++;
+                                var url = _config["RemoteHttp:HttpBase"] + file.Remove(0, _config["Directories:RemoteBase"].Length);
+                                try
+                                {
+                                    using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+                                    response.EnsureSuccessStatusCode();
+                                    using (var dataStream = await response.Content.ReadAsStreamAsync())
+                                    using (var fileStream = new FileStream(localPath.FullName, FileMode.CreateNew))
+                                        await dataStream.CopyToAsync(fileStream, token);
+                                    _logger.LogDebug("Finished download");
+                                    filesDownloaded++;
+                                }
+                                catch (Exception e)
+                                {
+                                    _logger.LogError(e, "Failed to download from {0}", url);
+                                }
                             }
                             else
                             {
@@ -97,9 +118,11 @@ namespace Sshanty.Workers
             }
         }
 
-        private List<string> ExploreDirectoryForFiles(SftpClient sftp, string path, int depth = 0)
+        private List<string> ExploreDirectoryForFiles(SftpClient sftp, string path, CancellationToken token = default, int depth = 0)
         {
             var discoveredFiles = new List<string>();
+            if (token.IsCancellationRequested)
+                return discoveredFiles;
             if (depth >= DISCOVERY_RECURSE_MAX_DEPTH)
             {
                 _logger.LogWarning("Reached maximum recursion depth of {0}", DISCOVERY_RECURSE_MAX_DEPTH);
@@ -113,7 +136,7 @@ namespace Sshanty.Workers
                 else if (item.IsDirectory && item.Name != ".." && item.Name != ".")
                 {
                     _logger.LogDebug("Recursing into directory {0}", item.FullName);
-                    discoveredFiles.AddRange(ExploreDirectoryForFiles(sftp, item.FullName, depth + 1));
+                    discoveredFiles.AddRange(ExploreDirectoryForFiles(sftp, item.FullName, token, depth + 1));
                 }
             }
 

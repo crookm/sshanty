@@ -24,7 +24,6 @@ namespace Sshanty.Services
             _config = config;
         }
 
-
         public FileType ImpliedFileType(string path)
         {
             var extension = Path.GetExtension(path);
