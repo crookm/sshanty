@@ -73,7 +73,7 @@ namespace Sshanty.Workers
                             var localPath = _mediaFileService.GenerateFullLocalPath(contract);
                             if (!localPath.Directory.Exists)
                                 localPath.Directory.Create();
-                            if (!localPath.Exists && localPath.Length < file.Length)
+                            if (!localPath.Exists || localPath.Length < file.Length)
                             {
                                 _logger.LogInformation("Downloading {0} ({1})",
                                     contract.Title.FirstOrDefault(),
@@ -89,7 +89,7 @@ namespace Sshanty.Workers
                                     using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
                                     response.EnsureSuccessStatusCode();
                                     using (var dataStream = await response.Content.ReadAsStreamAsync())
-                                    using (var fileStream = new FileStream(localPath.FullName, FileMode.CreateNew))
+                                    using (var fileStream = new FileStream(localPath.FullName, FileMode.Create))
                                         await dataStream.CopyToAsync(fileStream, token);
                                     _logger.LogInformation("Finished download");
                                     filesDownloaded++;
