@@ -78,7 +78,7 @@ namespace Sshanty.Workers
                                 _logger.LogInformation("Downloading {0} ({1})",
                                     contract.Title.FirstOrDefault(),
                                     contract.Type == MediaType.Episode
-                                        ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
+                                        ? string.Format("S{0:00}{1}", contract.Season, contract.GetEpisodeString())
                                         : contract.Type == MediaType.Movie
                                             ? contract.Year.ToString()
                                             : Path.GetFileName(file.FullName));
@@ -104,7 +104,7 @@ namespace Sshanty.Workers
                                 _logger.LogDebug("Skipped downloading {0} ({1}) as it already exists",
                                     contract.Title.FirstOrDefault(),
                                     contract.Type == MediaType.Episode
-                                        ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
+                                        ? string.Format("S{0:00}{1}", contract.Season, contract.GetEpisodeString())
                                         : contract.Type == MediaType.Movie
                                             ? contract.Year.ToString()
                                             : Path.GetFileName(file.FullName));

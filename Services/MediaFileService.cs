@@ -53,7 +53,7 @@ namespace Sshanty.Services
                 case MediaType.Episode:
                     if (contract.Title.Count == 0 ||
                         !contract.Season.HasValue ||
-                        !contract.Episode.HasValue)
+                        contract.Episode.Count < 1)
                         throw new ArgumentNullException("Series must have a title, season, and episode");
                     paths.Add("tv");
                     contract.Title[0] = ConvertToAlphaNumSortableTitle(contract.Title[0]);
@@ -61,8 +61,8 @@ namespace Sshanty.Services
                     seriesTitle = textInfo.ToTitleCase(seriesTitle);
                     paths.Add(seriesTitle);
                     paths.Add(string.Format("Season {0}", contract.Season));
-                    paths.Add(string.Format("S{0:00}E{1:00}.{2}",
-                        contract.Season, contract.Episode, contract.Container));
+                    paths.Add(string.Format("S{0:00}{1}.{2}",
+                        contract.Season, contract.GetEpisodeString(), contract.Container));
                     break;
                 case MediaType.Movie:
                     if (contract.Title.Count == 0 ||
