@@ -11,7 +11,7 @@ namespace Sshanty.Serialisers
         {
             if (reader.TokenType != JsonTokenType.StartArray)
             {
-                if (reader.TokenType == JsonTokenType.String)
+                if (reader.TokenType == JsonTokenType.Number)
                     return new List<int> { reader.GetInt32() };
             }
             else
@@ -21,7 +21,7 @@ namespace Sshanty.Serialisers
                 {
                     if (reader.TokenType == JsonTokenType.EndArray)
                         return value;
-                    if (reader.TokenType == JsonTokenType.String)
+                    if (reader.TokenType == JsonTokenType.Number)
                         value.Add(reader.GetInt32());
                 }
             }
