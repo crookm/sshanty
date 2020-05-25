@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Renci.SshNet.Sftp;
 using Sshanty.Contracts;
 using Sshanty.Contracts.Enums;
 
@@ -24,9 +25,9 @@ namespace Sshanty.Services
             _config = config;
         }
 
-        public FileType ImpliedFileType(string path)
+        public FileType ImpliedFileType(SftpFile file)
         {
-            var extension = Path.GetExtension(path);
+            var extension = Path.GetExtension(file.FullName);
 
             if (string.IsNullOrEmpty(extension))
                 return FileType.Other;
@@ -92,7 +93,7 @@ namespace Sshanty.Services
                 string.Equals(mainTitleWords.First(), "the", StringComparison.OrdinalIgnoreCase))
             {
                 mainTitleWords.RemoveAt(0);
-                mainTitleWords[mainTitleWords.Count - 1] = mainTitleWords[mainTitleWords.Count - 1] + ",";
+                mainTitleWords[^1] = mainTitleWords[^1] + ",";
                 mainTitleWords.Add("The");
                 outTitle = string.Join(" ", mainTitleWords);
             }

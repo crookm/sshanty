@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Renci.SshNet;
+using Renci.SshNet.Sftp;
 using Sshanty.Services;
 using Sshanty.Contracts.Enums;
 
@@ -58,19 +59,21 @@ namespace Sshanty.Workers
                 using (var sftp = new SftpClient(connectionInfo))
                 {
                     sftp.Connect();
+                    _logger.LogInformation("Exploring remote for media...");
                     var files = ExploreDirectoryForFiles(sftp, _config["Directories:RemoteBase"], token);
                     files.RemoveAll(x => _mediaFileService.ImpliedFileType(x) != FileType.Video);
+                    _logger.LogInformation("Discovered {0} files", files.Count);
                     foreach (var file in files)
                     {
                         if (token.IsCancellationRequested)
                             break;
-                        var contract = _mediaInformationService.GetMediaInformation(file, token);
+                        var contract = _mediaInformationService.GetMediaInformation(file.FullName, token);
                         if (contract.Success)
                         {
                             var localPath = _mediaFileService.GenerateFullLocalPath(contract);
                             if (!localPath.Directory.Exists)
                                 localPath.Directory.Create();
-                            if (!localPath.Exists)
+                            if (!localPath.Exists && localPath.Length < file.Length)
                             {
                                 _logger.LogInformation("Downloading {0} ({1})",
                                     contract.Title.FirstOrDefault(),
@@ -78,9 +81,9 @@ namespace Sshanty.Workers
                                         ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
                                         : contract.Type == MediaType.Movie
                                             ? contract.Year.ToString()
-                                            : Path.GetFileName(file));
-                                _logger.LogDebug("Downloading {0} to {1} ...", Path.GetFileName(file), localPath.FullName);
-                                var url = _config["RemoteHttp:HttpBase"] + file.Remove(0, _config["Directories:RemoteBase"].Length);
+                                            : Path.GetFileName(file.FullName));
+                                _logger.LogDebug("Downloading {0} to {1} ...", Path.GetFileName(file.FullName), localPath.FullName);
+                                var url = _config["RemoteHttp:HttpBase"] + file.FullName.Remove(0, _config["Directories:RemoteBase"].Length);
                                 try
                                 {
                                     using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
@@ -88,7 +91,7 @@ namespace Sshanty.Workers
                                     using (var dataStream = await response.Content.ReadAsStreamAsync())
                                     using (var fileStream = new FileStream(localPath.FullName, FileMode.CreateNew))
                                         await dataStream.CopyToAsync(fileStream, token);
-                                    _logger.LogDebug("Finished download");
+                                    _logger.LogInformation("Finished download");
                                     filesDownloaded++;
                                 }
                                 catch (Exception e)
@@ -104,7 +107,7 @@ namespace Sshanty.Workers
                                         ? string.Format("S{0:00}E{1:00}", contract.Season, contract.Episode)
                                         : contract.Type == MediaType.Movie
                                             ? contract.Year.ToString()
-                                            : Path.GetFileName(file));
+                                            : Path.GetFileName(file.FullName));
                                 filesSkipped++;
                             }
                         }
@@ -118,9 +121,9 @@ namespace Sshanty.Workers
             }
         }
 
-        private List<string> ExploreDirectoryForFiles(SftpClient sftp, string path, CancellationToken token = default, int depth = 0)
+        private List<SftpFile> ExploreDirectoryForFiles(SftpClient sftp, string path, CancellationToken token = default, int depth = 0)
         {
-            var discoveredFiles = new List<string>();
+            var discoveredFiles = new List<SftpFile>();
             if (token.IsCancellationRequested)
                 return discoveredFiles;
             if (depth >= DISCOVERY_RECURSE_MAX_DEPTH)
@@ -132,7 +135,7 @@ namespace Sshanty.Workers
             var remoteDirectory = sftp.ListDirectory(path);
             foreach (var item in remoteDirectory)
             {
-                if (item.IsRegularFile) discoveredFiles.Add(item.FullName);
+                if (item.IsRegularFile) discoveredFiles.Add(item);
                 else if (item.IsDirectory && item.Name != ".." && item.Name != ".")
                 {
                     _logger.LogDebug("Recursing into directory {0}", item.FullName);
