@@ -3,6 +3,6 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ssh.net" Version="2016.1.0" />
+    <PackageReference Include="ssh.net" Version="2020.0.2" />
   </ItemGroup>
 </Project>
